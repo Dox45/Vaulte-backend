@@ -73,9 +73,9 @@ class IdentityVerifyRequest(BaseModel):
     first_name: str
     last_name: str
     date_of_birth: str = Field(..., description="Format: YYYY-MM-DD")
-    selfie_image: str = Field(
-        ...,
-        description="Base64 image or URL of face captured during liveness check"
+    selfie_image: Optional[str] = Field(
+        None,
+        description="Optional base64 image; if not provided, server will use captured liveness frame"
     )
 
 

@@ -7,7 +7,6 @@ from app.models.schemas import (
     VaultScoreResponse,
     DeliveryConfirmRequest, DeliveryConfirmResponse,
 )
-from app.services.liveness_service import validate_liveness_frame
 from app.services.voice_service import (
     get_challenge_phrase,
     get_assemblyai_realtime_token,
@@ -16,50 +15,12 @@ from app.services.voice_service import (
 from app.services.identity_service import verify_nin_with_face
 from app.services.vault_score_service import calculate_vault_score
 from app.services.escrow_service import release_escrow
+from app.services.liveness_challenge import get_selfie
 import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-# ════════════════════════════════════════════════════════════════
-# PIPELINE 1A — LIVENESS CHECK
-# Frontend captures video, runs MediaPipe client-side,
-# then sends frame + signals here for server-side re-validation
-# ════════════════════════════════════════════════════════════════
-
-@router.post(
-    "/vendor/liveness",
-    response_model=LivenessCheckResponse,
-    summary="Step 1: Validate liveness frame from MediaPipe",
-    description="""
-    Frontend responsibility:
-    - Load MediaPipe FaceMesh + FaceDetection in browser
-    - Prompt vendor to blink and turn head
-    - Capture frame when gestures are detected
-    - Send frame as base64 + blink_detected + head_turn_detected
-
-    Backend responsibility (this endpoint):
-    - Re-validate frame using server-side MediaPipe
-    - Detect face presence, size, landmark consistency
-    - Return liveness_passed + confidence_score
-    """
-)
-async def check_liveness(payload: LivenessCheckRequest):
-    result = validate_liveness_frame(
-        frame_base64=payload.frame_base64,
-        frontend_blink=payload.blink_detected,
-        frontend_head_turn=payload.head_turn_detected
-    )
-    return LivenessCheckResponse(
-        success=True,
-        session_id=payload.session_id,
-        liveness_passed=result["liveness_passed"],
-        face_detected=result["face_detected"],
-        confidence_score=result["confidence_score"],
-        message=result["message"]
-    )
 
 
 # ════════════════════════════════════════════════════════════════
@@ -160,12 +121,25 @@ async def verify_voice(payload: VoiceChallengeVerifyRequest):
     """
 )
 async def verify_identity(payload: IdentityVerifyRequest):
+    selfie_image = payload.selfie_image
+
+    # If selfie not provided in payload, try to retrieve it from session storage
+    if not selfie_image:
+        selfie_image = await get_selfie(payload.session_id)
+
+    if not selfie_image:
+        logger.warning(f"Identity verification failed | session={payload.session_id} | reason=No selfie found")
+        raise HTTPException(
+            status_code=400,
+            detail="No captured selfie found for this session. Please complete liveness check first."
+        )
+
     result = await verify_nin_with_face(
         nin=payload.nin,
         first_name=payload.first_name,
         last_name=payload.last_name,
         date_of_birth=payload.date_of_birth,
-        selfie_image=payload.selfie_image
+        selfie_image=selfie_image
     )
 
     if not result["success"]:

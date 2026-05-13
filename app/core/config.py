@@ -47,7 +47,38 @@ class Settings(BaseSettings):
         alias="SECRET_KEY",
         description="Secret key for application security"
     )
+    redis_url: str = "redis://localhost:6379/0"
+ 
+    # ── Liveness hardening ────────────────────────────────────────────────────
+    # Minimum composite identity score (0-100) to pass verification
+    min_identity_score:  float = 70.0
+ 
+    # Challenge session TTL in seconds
+    liveness_ttl_secs:   int   = 90
+ 
+    # Hard minimum elapsed time (seconds) — below this = bot
+    liveness_min_elapsed: float = 3.0
+ 
+    # Entropy variance floors (soft flag, not hard reject)
+    entropy_brightness_min: float = 0.4
+    entropy_noise_min:       float = 0.2
 
+    redis_url: str = "redis://localhost:6379/0"
+ 
+    # ── Liveness hardening ────────────────────────────────────────────────────
+    # Minimum composite identity score (0-100) to pass verification
+    min_identity_score:  float = 70.0
+ 
+    # Challenge session TTL in seconds
+    liveness_ttl_secs:   int   = 90
+ 
+    # Hard minimum elapsed time (seconds) — below this = bot
+    liveness_min_elapsed: float = 3.0
+ 
+    # Entropy variance floors (soft flag, not hard reject)
+    entropy_brightness_min: float = 0.4
+    entropy_noise_min:       float = 0.2
+ 
     class Config:
         env_file = ".env"
         case_sensitive = False

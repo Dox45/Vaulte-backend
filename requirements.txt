@@ -11,3 +11,5 @@ mediapipe==0.10.14
 opencv-python-headless==4.10.0.82
 numpy==1.26.4
 Pillow==10.3.0
+redis==5.0.4
+fakeredis[lua]==2.23.2

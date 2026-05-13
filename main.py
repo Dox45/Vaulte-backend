@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers.vault import router
+from app.routers.vault import router as vault_router
+from app.routers.liveness import router as liveness_router
+from app.core.redis import redis_lifespan
 import logging
 
 logging.basicConfig(
@@ -15,10 +17,11 @@ app = FastAPI(
 
 AI-powered vendor verification and escrow system.
 
-### Verification Pipeline
+### Verification Pipeline (Hardened)
 | Step | Endpoint | Technology |
 |------|----------|------------|
-| 1 | `POST /vendor/liveness` | MediaPipe (server-side frame validation) |
+| 1a | `GET /vendor/liveness/challenge` | Server-driven challenge generation |
+| 1b | `POST /vendor/liveness` | Timing + Entropy + Challenge verification |
 | 2a | `POST /vendor/voice/start` | AssemblyAI (get real-time token) |
 | 2b | `POST /vendor/voice/verify` | AssemblyAI (verify transcript) |
 | 3 | `POST /vendor/verify-identity` | Youverify (NIN + face match) |
@@ -31,30 +34,31 @@ AI-powered vendor verification and escrow system.
 | 6 | `POST /order/confirm-delivery` | GPS check + Squad Transfer |
 
 ### Frontend Developer Notes
-- Steps 1–3 must be called in sequence — each step gates the next
-- The `session_id` must be consistent across all steps for one verification session
-- The `frame_base64` from Step 1 is reused as `selfie_image` in Step 3
-- AssemblyAI WebSocket connection is opened directly from the frontend using the token from Step 2a
+- Steps 1a & 1b are the new hardened liveness flow.
+- The `session_id` must be consistent across all steps.
+- Submission must include the `nonce` and `sequence` from the challenge.
     """,
-    version="1.0.0",
+    version="1.1.0",
+    lifespan=redis_lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # Restrict to your frontend domain in production
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(router, prefix="/api/v1", tags=["Vault"])
+app.include_router(liveness_router, prefix="/api/v1", tags=["Liveness"])
+app.include_router(vault_router, prefix="/api/v1", tags=["Vault"])
 
 @app.get("/", tags=["Health"])
 async def root():
     return {
         "service": "Vault API",
         "status": "running",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "docs": "/docs"
     }
 
