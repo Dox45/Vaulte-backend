@@ -281,7 +281,7 @@ def _parse_and_score(
     # ── Face match ────────────────────────────────────────────────────────
     # ShuftiPro returns face_match result in ekyc block when face_match=1
     # Possible keys: "face" or "face_match" with value 1 (pass) / 0 (fail)
-    face_result = ekyc_result.get("face", ekyc_result.get("face_match", None))
+    face_result = verification_result.get("face", ekyc_result.get("face", ekyc_result.get("face_match", None)))
     face_match  = face_result == 1
     # ShuftiPro doesn't expose a raw confidence score in offsite mode —
     # treat pass as 100, fail as 0 for score calculation.
@@ -386,7 +386,7 @@ def _calculate_identity_score(
 def _names_match(
     submitted: tuple[str, str, str],
     returned: tuple[str, str, str],
-    threshold: float = 0.82,
+    threshold: float = 0.75,
 ) -> bool:
     def flatten(parts: tuple) -> str:
         # Guard against None — ShuftiPro can return None for any name field
@@ -398,10 +398,17 @@ def _names_match(
     if not sub or not ret:
         logger.warning(f"Name comparison skipped — empty after flatten: submitted='{sub}' returned='{ret}'")
         return False
+    if ratio >= threshold:
+        return True
 
     ratio = SequenceMatcher(None, sub, ret).ratio()
     logger.info(f"Name similarity: '{sub}' vs '{ret}' → {ratio:.2f} (threshold: {threshold})")
     return ratio >= threshold
+    sub_first_last = f"{submitted[0] or ''} {submitted[2] or ''}".strip().lower()
+    ret_first_last = f"{returned[0] or ''} {returned[2] or ''}".strip().lower()
+    fallback_ratio = SequenceMatcher(None, sub_first_last, ret_first_last).ratio()
+    logger.info(f"Name fallback (first+last only): '{sub_first_last}' vs '{ret_first_last}' → {fallback_ratio:.2f}")
+    return fallback_ratio >= 0.90
 
 # def _dob_matches(submitted: str, returned: str) -> bool:
 #     """
