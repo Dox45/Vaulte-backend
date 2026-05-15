@@ -110,7 +110,7 @@ def _build_payload(
     ekyc_obj: dict = {
         "face_match": "1",
         "fuzzy_match": "1",
-        "personal_details": personal_details,
+        "national_id": personal_details["national_id"],
         "type": "nin",
     }
 
