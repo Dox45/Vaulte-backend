@@ -111,6 +111,7 @@ def _build_payload(
         "face_match": "1",
         "fuzzy_match": "1",
         "personal_details": personal_details,
+        "type": "nin",
     }
 
     if contact_details:
