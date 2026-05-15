@@ -5,14 +5,14 @@ from app.models.schemas import (
     VoiceChallengeVerifyRequest, VoiceChallengeVerifyResponse,
     IdentityVerifyRequest, IdentityVerifyResponse,
     VaultScoreResponse,
-    DeliveryConfirmRequest, DeliveryConfirmResponse,
+    DeliveryConfirmRequest, DeliveryConfirmResponse, VaultScoreRequest
 )
 from app.services.voice_service import (
     get_challenge_phrase,
     get_assemblyai_realtime_token,
     verify_voice_challenge,
 )
-from app.services.identity_service import verify_nin_with_face
+from app.services.identity_service import verify_nin_with_shufti
 from app.services.vault_score_service import calculate_vault_score
 from app.services.escrow_service import release_escrow
 from app.services.liveness_challenge import get_selfie
@@ -105,14 +105,14 @@ async def verify_voice(payload: VoiceChallengeVerifyRequest):
 @router.post(
     "/vendor/verify-identity",
     response_model=IdentityVerifyResponse,
-    summary="Step 3: NIN + face match via Youverify",
+    summary="Step 3: NIN + face match via ShuftiPro",
     description="""
     Call this ONLY after liveness + voice have both passed.
 
-    Sends to Youverify in one API call:
+    Sends to ShuftiPro in one passive eIDV API call:
     - NIN lookup against NIMC database
-    - Name + DOB data validation
-    - Selfie face match against NIMC photo
+    - Name + DOB comparison against returned government record
+    - Selfie face match against NIMC photo (via face_match flag)
 
     The selfie_image should be the same base64 frame
     captured during the liveness check in Step 1.
@@ -134,12 +134,14 @@ async def verify_identity(payload: IdentityVerifyRequest):
             detail="No captured selfie found for this session. Please complete liveness check first."
         )
 
-    result = await verify_nin_with_face(
+    result = await verify_nin_with_shufti(
+        reference=payload.session_id,
         nin=payload.nin,
         first_name=payload.first_name,
+        middle_name=payload.middle_name,
         last_name=payload.last_name,
         date_of_birth=payload.date_of_birth,
-        selfie_image=selfie_image
+        selfie_image=selfie_image,
     )
 
     if not result["success"]:
@@ -147,12 +149,8 @@ async def verify_identity(payload: IdentityVerifyRequest):
 
     # Calculate preliminary VaultScore after identity
     # (no transaction history yet for new vendors)
-    score_result = calculate_vault_score(
-        identity_score=result["identity_score"],
-        liveness_confidence=0.80,   # Placeholder — pass actual value from session in production
-        voice_score=0.80,           # Placeholder — pass actual value from session in production
-    )
-
+    # identity_score = result["identity_score"]
+    
     return IdentityVerifyResponse(
         success=True,
         session_id=payload.session_id,
@@ -162,39 +160,35 @@ async def verify_identity(payload: IdentityVerifyRequest):
         face_confidence=result["face_confidence"],
         face_match=result["face_match"],
         identity_score=result["identity_score"],
-        vault_score=score_result["vault_score"],
         message=result["message"]
     )
-
 
 # ════════════════════════════════════════════════════════════════
 # VAULT SCORE
 # ════════════════════════════════════════════════════════════════
 
-@router.get(
-    "/vendor/score/{vendor_id}",
+@router.post(
+    "/vendor/vault-score",
     response_model=VaultScoreResponse,
-    summary="Get current VaultScore for a vendor",
+    summary="Calculate final VaultScore after all 3 verification steps",
     description="""
-    Returns the current VaultScore with full breakdown.
-    Score updates after every transaction event.
-    In production this reads from the vendor's transaction history DB.
+    Called internally by completeSession after identity + liveness + voice
+    have all passed. Accepts real scores from the session rather than
+    using hardcoded placeholders.
     """
 )
-async def get_vault_score(vendor_id: str):
-    # In production: fetch vendor transaction history from DB
-    # For demo: return score based on identity verification only
+async def get_vault_score(payload: VaultScoreRequest):
     score_result = calculate_vault_score(
-        identity_score=85.0,
-        liveness_confidence=0.92,
-        voice_score=0.88,
-        total_orders=0,
-        successful_deliveries=0,
-        total_disputes=0,
+        identity_score=payload.identity_score,
+        liveness_confidence=payload.liveness_confidence,
+        voice_score=payload.voice_score,
+        total_orders=payload.total_orders or 0,
+        successful_deliveries=payload.successful_deliveries or 0,
+        total_disputes=payload.total_disputes or 0,
     )
     return VaultScoreResponse(
         success=True,
-        vendor_id=vendor_id,
+        vendor_id=payload.vendor_id,
         vault_score=score_result["vault_score"],
         score_breakdown=score_result["score_breakdown"],
         trust_level=score_result["trust_level"],

@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     # Entropy variance floors (soft flag, not hard reject)
     entropy_brightness_min: float = 0.4
     entropy_noise_min:       float = 0.2
+    # in your config
+    shufti_client_id: str = "74f484864cd4ca76b30a63e6d99d50b716b1d83e95c991e8599e547faefdff23"
+    shufti_secret_key: str = Field(
+        default="",
+        alias="SHUFTI_SECRET_KEY",
+        description="Shufti API key for identity verification"
+    )
+    shufti_callback_url: str   # must be registered in ShuftiPro Backoffice
  
     class Config:
         env_file = ".env"

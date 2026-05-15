@@ -123,3 +123,13 @@ class DeliveryConfirmResponse(BaseModel):
     gps_verified: bool
     distance_metres: float
     message: str = Field(..., description="If gps_verified=true, JS backend should release escrow to vendor via Squad API")
+
+
+class VaultScoreRequest(BaseModel):
+    vendor_id: str
+    identity_score: float          # 0-100, from ShuftiPro result
+    liveness_confidence: float     # 0-1, from scores.liveness_confidence
+    voice_score: float             # 0-1, from confidence_score
+    total_orders: int = 0
+    successful_deliveries: int = 0
+    total_disputes: int = 0
