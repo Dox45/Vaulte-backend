@@ -81,52 +81,63 @@ def _build_payload(
     Offsite passive eIDV payload for Nigeria.
 
     Key flags:
-      - eidv_verification_type: "Passive"   → no redirect URL / no onsite UI
-      - verification_method: "1x1"           → one data source (NIMC)
-      - face_match: "1"                      → ShuftiPro fetches NIMC photo
-                                               and compares against selfie
-      - previous_record: false               → always do a fresh lookup
-      - is_sandbox: "0"                      → flip to "1" for testing
+      - eidv_verification_type: "Passive"
+      - verification_method: "1x1"
+      - face_match: "1"
+      - previous_record: False
+      - is_sandbox: "0"
     """
+
     personal_details: dict = {
         "first_name": first_name,
         "last_name": last_name,
         "national_id": nin,
-        "dob": date_of_birth,       # "YYYY-MM-DD"
+        "dob": date_of_birth,  # YYYY-MM-DD
     }
+
     if middle_name:
         personal_details["middle_name"] = middle_name
+
     if gender:
         personal_details["gender"] = gender
 
     contact_details: dict = {}
+
     if phone_number:
         contact_details["phone_number"] = phone_number
 
+    # eKYC object
     ekyc_obj: dict = {
-        "face_match": "1",          # compare NIMC photo vs selfie
-        "fuzzy_match": "1",         # allow slight name spelling variations
+        "face_match": "1",
+        "fuzzy_match": "1",
         "personal_details": personal_details,
     }
+
     if contact_details:
         ekyc_obj["contact_details"] = contact_details
-
-    # The selfie is sent as a proof image alongside the ekyc object.
-    # ShuftiPro expects it under proof (base64 of the face/selfie image).
-    ekyc_obj["proof"] = f"data:image/jpeg;base64,{selfie_b64}"
 
     return {
         "reference": reference,
         "country": "NG",
         "language": "EN",
-        "callback_url": settings.shufti_callback_url,   # add to your Settings
+        "callback_url": settings.shufti_callback_url,
+
+        # eIDV settings
         "eidv_verification_type": "Passive",
         "verification_method": "1x1",
         "previous_record": False,
-        "is_sandbox": "0",          # change to "1" for sandbox testing
+        "is_sandbox": "0",
+
+        # REQUIRED FACE SERVICE
+        "face": {
+            "proof": f"data:image/jpeg;base64,{selfie_b64}",
+            "verification_mode": "image_only",
+            "check_duplicate_request": "0",
+        },
+
+        # eKYC service
         "ekyc": ekyc_obj,
     }
-
 
 # ---------------------------------------------------------------------------
 # HTTP call
