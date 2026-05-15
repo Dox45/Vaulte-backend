@@ -53,6 +53,8 @@ async def verify_nin_with_shufti(
     if not raw.get("success"):
         return raw  # propagate transport / auth errors
 
+    logger.info(f"ShuftiPro raw response: {raw['body']}")
+
     return _parse_and_score(
         shufti_response=raw["body"],
         submitted_first_name=first_name,
@@ -249,10 +251,21 @@ def _parse_and_score(
         .get("personal_details", {})
     )
 
-    returned_first  = personal.get("first_name", "")
-    returned_middle = personal.get("middle_name", "")
-    returned_last   = personal.get("last_name", "")
-    returned_dob    = personal.get("dob", "")         # "YYYY-MM-DD" or ""
+    # Log exactly what ShuftiPro returned so we can debug mismatches
+    logger.info(f"ShuftiPro personal_details returned: {personal}")
+    logger.info(f"ShuftiPro verification_result returned: {verification_result}")
+
+    # Use `or ""` not `.get(key, "")` — ShuftiPro can return None explicitly
+    returned_first  = personal.get("first_name") or ""
+    returned_middle = personal.get("middle_name") or ""
+    returned_last   = personal.get("last_name") or ""
+    returned_dob    = personal.get("dob") or ""
+
+    logger.info(
+        f"Name comparison — submitted: '{submitted_first_name} {submitted_middle_name} {submitted_last_name}' | "
+        f"returned: '{returned_first} {returned_middle} {returned_last}'"
+    )
+    logger.info(f"DOB comparison — submitted: '{submitted_dob}' | returned: '{returned_dob}'")       # "YYYY-MM-DD" or ""
 
     # ── Name comparison ───────────────────────────────────────────────────
     name_match = _names_match(
@@ -347,45 +360,74 @@ def _calculate_identity_score(
 # Name / DOB helpers
 # ---------------------------------------------------------------------------
 
+# def _names_match(
+#     submitted: tuple[str, str, str],
+#     returned: tuple[str, str, str],
+#     threshold: float = 0.82,
+# ) -> bool:
+#     """
+#     Fuzzy full-name comparison.
+#     Concatenate all name parts, normalise whitespace, lowercase, then
+#     use SequenceMatcher ratio. threshold=0.82 tolerates minor typos /
+#     missing middle names while blocking clear mismatches.
+#     """
+#     def flatten(parts: tuple[str, str, str]) -> str:
+#         return " ".join(p.strip().lower() for p in parts if p.strip())
+
+#     sub = flatten(submitted)
+#     ret = flatten(returned)
+
+#     if not sub or not ret:
+#         return False
+
+#     ratio = SequenceMatcher(None, sub, ret).ratio()
+#     logger.debug(f"Name similarity: '{sub}' vs '{ret}' → {ratio:.2f}")
+#     return ratio >= threshold
 def _names_match(
     submitted: tuple[str, str, str],
     returned: tuple[str, str, str],
     threshold: float = 0.82,
 ) -> bool:
-    """
-    Fuzzy full-name comparison.
-    Concatenate all name parts, normalise whitespace, lowercase, then
-    use SequenceMatcher ratio. threshold=0.82 tolerates minor typos /
-    missing middle names while blocking clear mismatches.
-    """
-    def flatten(parts: tuple[str, str, str]) -> str:
-        return " ".join(p.strip().lower() for p in parts if p.strip())
+    def flatten(parts: tuple) -> str:
+        # Guard against None — ShuftiPro can return None for any name field
+        return " ".join(p.strip().lower() for p in parts if p and p.strip())
 
     sub = flatten(submitted)
     ret = flatten(returned)
 
     if not sub or not ret:
+        logger.warning(f"Name comparison skipped — empty after flatten: submitted='{sub}' returned='{ret}'")
         return False
 
     ratio = SequenceMatcher(None, sub, ret).ratio()
-    logger.debug(f"Name similarity: '{sub}' vs '{ret}' → {ratio:.2f}")
+    logger.info(f"Name similarity: '{sub}' vs '{ret}' → {ratio:.2f} (threshold: {threshold})")
     return ratio >= threshold
 
+# def _dob_matches(submitted: str, returned: str) -> bool:
+#     """
+#     Exact ISO date match ("YYYY-MM-DD").
+#     Returns False (not a mismatch) when ShuftiPro doesn't return a DOB —
+#     some NIMC records omit it. In that case we skip the DOB check rather
+#     than failing the whole verification.
+#     """
+#     if not returned:
+#         logger.warning("ShuftiPro returned no DOB — skipping DOB check")
+#         return True   # can't verify what we don't have
+
+#     return submitted.strip() == returned.strip()
 
 def _dob_matches(submitted: str, returned: str) -> bool:
-    """
-    Exact ISO date match ("YYYY-MM-DD").
-    Returns False (not a mismatch) when ShuftiPro doesn't return a DOB —
-    some NIMC records omit it. In that case we skip the DOB check rather
-    than failing the whole verification.
-    """
     if not returned:
         logger.warning("ShuftiPro returned no DOB — skipping DOB check")
-        return True   # can't verify what we don't have
+        return True
 
-    return submitted.strip() == returned.strip()
+    if not submitted:
+        logger.warning("Submitted DOB is empty — skipping DOB check")
+        return True
 
-
+    match = (submitted.strip() == returned.strip())
+    logger.info(f"DOB match: {match} — submitted='{submitted.strip()}' returned='{returned.strip()}'")
+    return match
 # ---------------------------------------------------------------------------
 # Message helpers
 # ---------------------------------------------------------------------------
