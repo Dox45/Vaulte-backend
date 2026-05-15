@@ -72,6 +72,7 @@ class IdentityVerifyRequest(BaseModel):
     nin: str = Field(..., min_length=11, max_length=11, description="11-digit NIN")
     first_name: str
     last_name: str
+    middle_name: str | None = None 
     date_of_birth: str = Field(..., description="Format: YYYY-MM-DD")
     selfie_image: Optional[str] = Field(
         None,
@@ -88,7 +89,6 @@ class IdentityVerifyResponse(BaseModel):
     face_confidence: float
     face_match: bool
     identity_score: float = Field(..., description="0-100 score from identity signals")
-    vault_score: Optional[float] = Field(None, description="Preliminary VaultScore after identity")
     message: str
 
 
