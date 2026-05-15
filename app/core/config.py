@@ -5,18 +5,6 @@ import os
 
 
 class Settings(BaseSettings):
-    # Youverify
-    youverify_token: str = Field(
-        default="",
-        alias="YOUVERIFY_API_KEY",
-        description="Youverify API key for identity verification"
-    )
-    youverify_base_url: str = Field(
-        default="https://api.sandbox.youverify.co",
-        alias="YOUVERIFY_BASE_URL",
-        description="Youverify API base URL"
-    )
-
     # AssemblyAI
     assemblyai_api_key: str = Field(
         default="",
