@@ -398,12 +398,12 @@ def _names_match(
     if not sub or not ret:
         logger.warning(f"Name comparison skipped — empty after flatten: submitted='{sub}' returned='{ret}'")
         return False
-    if ratio >= threshold:
-        return True
-
+    
     ratio = SequenceMatcher(None, sub, ret).ratio()
     logger.info(f"Name similarity: '{sub}' vs '{ret}' → {ratio:.2f} (threshold: {threshold})")
-    return ratio >= threshold
+    # return ratio >= threshold
+    if ratio >= threshold:
+        return True
     sub_first_last = f"{submitted[0] or ''} {submitted[2] or ''}".strip().lower()
     ret_first_last = f"{returned[0] or ''} {returned[2] or ''}".strip().lower()
     fallback_ratio = SequenceMatcher(None, sub_first_last, ret_first_last).ratio()
