@@ -40,12 +40,12 @@ logger   = logging.getLogger(__name__)
 settings = get_settings()
 
 # ── Challenge types ────────────────────────────────────────────────────────────
-ChallengeStep = Literal["blink", "turn_left", "turn_right", "nod", "smile"]
+ChallengeStep = Literal["blink", "nod", "smile"]
 
 ALL_CHALLENGES: list[ChallengeStep] = [
     "blink",
-    "turn_left",
-    "turn_right",
+    # "turn_left",
+    # "turn_right",
     "nod",
     "smile",
 ]
