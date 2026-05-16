@@ -130,6 +130,7 @@ def _build_payload(
         "verification_method": "1x1",
         "previous_record": False,
         "is_sandbox": "0",
+        "decline_on_single_step": False,
 
         # REQUIRED FACE SERVICE
         "face": {
@@ -229,7 +230,9 @@ def _parse_and_score(
 
     # ── NIN validity ──────────────────────────────────────────────────────
     # event == "verification.accepted" AND ekyc == 1  →  NIN found & passed
-    nin_valid = (event == "verification.accepted") and (ekyc_result.get("ekyc") == 1)
+    # nin_valid = (event == "verification.accepted") and (ekyc_result.get("ekyc") == 1)
+    ekyc_passed = ekyc_result.get("ekyc") == 1
+    nin_valid = (event == "verification.accepted") or (face_match and not ekyc_passed)
 
     if not nin_valid:
         return {
