@@ -227,6 +227,8 @@ def _parse_and_score(
     event = shufti_response.get("event", "")
     verification_result = shufti_response.get("verification_result", {})
     ekyc_result = verification_result.get("ekyc", {})
+    face_result = verification_result.get("face", None)
+    face_match = face_result == 1
 
     # ── NIN validity ──────────────────────────────────────────────────────
     # event == "verification.accepted" AND ekyc == 1  →  NIN found & passed
